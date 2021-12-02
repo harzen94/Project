@@ -1,20 +1,16 @@
 module Main where
 
 import Control.Monad (forever)
-import Sudoku (getSudokuField)
+import Sudoku (getSudokuField, makeField, makeSudoku, printSudoku)
 import System.Console.ANSI
-  ( Color (Blue),
-    ColorIntensity (Dull),
-    ConsoleLayer (Foreground),
-    SGR (Reset, SetColor),
-    setSGR,
-    setTitle,
-  )
 
 main :: IO ()
 main = do
+  let testInput = "111111111222222222333333333444444444555555555666666666777777777888888888999999999"
   setTitle "SudokuSolver"
   setSGR [SetColor Foreground Dull Blue]
-  putStrLn ("\n\n\n" ++ getSudokuField [[1, 2, 3], [3, 2, 1], [4, 5, 6]] "" ++ "\n\n\n")
+  let x = makeSudoku testInput
+  printSudoku (makeSudoku testInput)
   setSGR [Reset]
-  forever (getLine >>= putStrLn)
+
+--forever (getLine >>= putStrLn)
