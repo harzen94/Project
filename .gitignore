@@ -1,1 +1,6 @@
-dist-newstyle
+Main.exe
+Main.hi
+Main.o
+app/Main.hs
+Sudoku.hi
+Sudoku.o
