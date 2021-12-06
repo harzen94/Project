@@ -1,6 +1,6 @@
 module Sudoku where
 
-import Data.List (transpose)
+import Data.List (transpose, (\\))
 
 --Typdeklarationen
 type Sudoku = Matrix Wert
@@ -19,14 +19,14 @@ werte :: [Wert]
 werte = ['1' .. '9']
 
 istLeer :: Wert -> Bool
-istLeer param = param == '~'
+istLeer param = param == '.'
 
 --Hilfsfunktionen
 zeilen :: Matrix param -> [Reihe param]
-zeilen = id
+zeilen param = param
 
 spalten :: Matrix param -> [Reihe param]
-spalten = transpose
+spalten param = transpose param
 
 felder :: Matrix param -> [Reihe param]
 felder x = packAus (map spalten (packEin x))
@@ -39,30 +39,95 @@ aufteilen :: Int -> [param] -> [[param]]
 aufteilen by [] = []
 aufteilen by xs = take by xs : aufteilen by (drop by xs)
 
---Validierung
-istValide :: Sudoku -> Bool
-istValide sudoku =
-  all hatKeineDuplikate (zeilen sudoku)
-    && all hatKeineDuplikate (spalten sudoku)
-    && all hatKeineDuplikate (felder sudoku)
+einzelnesElement :: [a] -> Bool
+einzelnesElement [_] = True
+einzelnesElement _ = False
 
 hatKeineDuplikate :: Eq param => [param] -> Bool
 hatKeineDuplikate [] = True
 hatKeineDuplikate (x : xs) = notElem x xs && hatKeineDuplikate xs
 
-charToInt :: Char -> Int
-charToInt '0' = 0
-charToInt '1' = 1
-charToInt '2' = 2
-charToInt '3' = 3
-charToInt '4' = 4
-charToInt '5' = 5
-charToInt '6' = 6
-charToInt '7' = 7
-charToInt '8' = 8
-charToInt '9' = 9
-charToInt x = -1
+--Lösen des Sudokus
 
---Input
+loeseSudoku :: Sudoku -> [Sudoku]
+loeseSudoku s = sucheLoesung (ungueltigeWerteEntfernen (moeglicheWerte s))
 
---Output
+sucheLoesung :: Matrix (MoeglicheWerte) -> [Sudoku]
+sucheLoesung m
+  | istBlockiert m = []
+  | istFertig m = generiereLoesungen m
+  | otherwise = [g | m' <- kartProdMehrereMoeglichenWerte m, g <- sucheLoesung (ungueltigeWerteEntfernen m')]
+
+--Mögliche Werte pro Kästchen
+
+type MoeglicheWerte = [Wert]
+
+moeglicheWerte :: Sudoku -> Matrix (MoeglicheWerte)
+--Setzt die Werte 1 - 9 in die leeren Kästchen
+moeglicheWerte s = map (map auswahl) s
+  where
+    auswahl a =
+      if istLeer a
+        then werte
+        else [a]
+
+-- //
+
+--Generiere eine Liste von möglichen Lösungen
+
+generiereLoesungen :: Matrix (MoeglicheWerte) -> [Sudoku]
+--Nimmt die Matrix mit den möglichen Belegungen der einzelnen Kästchen und erstellt jede mögliche Lösung
+generiereLoesungen param = kartesischesProdukt (map kartesischesProdukt param)
+
+kartesischesProdukt :: [[param]] -> [[param]]
+kartesischesProdukt [] = [[]]
+kartesischesProdukt (xs : xss) = [y : ys | y <- xs, ys <- kartesischesProdukt xss]
+
+-- //
+
+istFertig :: Matrix (MoeglicheWerte) -> Bool
+--Sudoku fertig gelöst wenn jedes Kästchen einen möglichen Wert hat
+istFertig m = all (all einzelnesElement) m
+
+--Filter für nicht-mögliche generierte Lösungen
+
+ungueltigeWerteEntfernen :: Matrix (MoeglicheWerte) -> Matrix (MoeglicheWerte)
+--Entfernt durch die Regeln unmögliche Werte aus den möglichen Werten
+ungueltigeWerteEntfernen param = entferneWerte felder (entferneWerte spalten (entferneWerte zeilen param))
+  where
+    entferneWerte function row = function (map reduzieren (function row))
+
+reduzieren :: Reihe (MoeglicheWerte) -> Reihe (MoeglicheWerte)
+reduzieren xss = [xs `minus` einzelneElemente | xs <- xss]
+  where
+    einzelneElemente = concat (filter einzelnesElement xss)
+
+minus :: MoeglicheWerte -> MoeglicheWerte -> MoeglicheWerte
+xs `minus` ys = if einzelnesElement xs then xs else xs \\ ys
+
+enthaeltKeineMoeglichenWerte :: Matrix (MoeglicheWerte) -> Bool
+enthaeltKeineMoeglichenWerte param = any (any null) param
+
+sichereMoeglichenWerte :: Matrix (MoeglicheWerte) -> Bool
+--True wenn keine Dopplungen in Zeile/Spalte/Feld vorkommen
+sichereMoeglichenWerte m =
+  all istEinheitlich (zeilen m)
+    && all istEinheitlich (spalten m)
+    && all istEinheitlich (felder m)
+
+istEinheitlich :: Reihe (MoeglicheWerte) -> Bool
+istEinheitlich r = hatKeineDuplikate (concat (filter einzelnesElement r))
+
+istBlockiert :: Matrix (MoeglicheWerte) -> Bool
+--True wenn Matrix keine mögliche Lösung ist
+istBlockiert m = enthaeltKeineMoeglichenWerte m || not (sichereMoeglichenWerte m)
+
+kartProdMehrereMoeglichenWerte :: Matrix (MoeglicheWerte) -> [Matrix (MoeglicheWerte)]
+--Funtkioniert wie generiereLoesungen, jedoch nur für das erste Kästchen mit mehreren Möglichkeiten
+kartProdMehrereMoeglichenWerte m =
+  [reihen1 ++ [reihe1 ++ [c] : reihe2] ++ reihen2 | c <- cs]
+  where
+    (reihen1, reihe : reihen2) = span (all einzelnesElement) m
+    (reihe1, cs : reihe2) = span einzelnesElement reihe
+
+-- //
